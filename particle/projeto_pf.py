@@ -4,11 +4,11 @@
 Esta classe deve conter todas as suas implementações relevantes para seu filtro de partículas
 """
 
-from pf import Particle, create_particles
+from pf import Particle, create_particles, draw_random_sample
 import numpy as np
 import inspercles # necessário para o a função nb_lidar que simula o laser
 import math
-
+from scipy import stats
 
 largura = 775 # largura do mapa
 altura = 748  # altura do mapa
@@ -56,7 +56,20 @@ movimentos_relativos = [[0, -math.pi/3],[10, 0],[10, 0], [10, 0], [10, 0],[15, 0
 
 movimentos = movimentos_relativos
 
-
+def create_particles(minx, miny, maxx, maxy, n_particulas=10):
+    """
+        Cria num particulas
+        uniformemente situadas no intervalo x - var_x a x + var_x, y - var_x at'e y + var_y e theta - var_theta a theta + var_theta
+        retorna uma lista de objetos Particle
+    """
+    particle_cloud = []
+    for i in range(num):
+        x = np.random.uniform(minx, maxx)
+        y = np.random.uniform(miny, maxy)
+        theta = np.random.uniform(0, math.pi)
+        prob = Particle(x, y, theta, w=1.0) # A prob. w vai ser normalizada depois
+        particle_cloud.append(prob)
+    return particle_cloud
 
 def cria_particulas(minx=0, miny=0, maxx=largura, maxy=altura, n_particulas=num_particulas):
     """
@@ -75,6 +88,12 @@ def move_particulas(particulas, movimento):
         Você não precisa mover o robô. O código fornecido pelos professores fará isso
         
     """
+    for particula in particulas:  
+      t, rot = movimento
+      movimento[0] = stats.norm.rvs(loc=t, scale=1)
+      movimento[1] = stats.norm.rvs(loc=rot, scale=math.radians(1))
+      pf.move_relative(movimento)
+
     return particulas
     
 def leituras_laser_evidencias(robot, particulas):
@@ -93,6 +112,12 @@ def leituras_laser_evidencias(robot, particulas):
     
     leitura_robo = inspercles.nb_lidar(robot, angles)
     
+    for particula in particulas:
+      medidas = inspercles.lidar(particula, angles)
+      for angulo in medidas:
+            soma_probs += norm.pdf(angulos[angulo], loc=leitura_robo[angulo], scale=1)
+            particula.W = soma_probs
+            soma_probs=0
     # Voce vai precisar calcular a leitura para cada particula usando inspercles.nb_lidar e depois atualizar as probabilidades
 
 
@@ -109,7 +134,15 @@ def reamostrar(particulas, n_particulas = num_particulas):
         
         Use 1/n ou 1, não importa desde que seja a mesma
     """
-    return particulas
+    particulas_pesos = [p.w for p in particulas]
+    novas_particulas = draw_random_sample(particulas, particulas_pesos, n_particulas)
+    for p in novas_particulas:
+      p.x = norm.rvs(p.x, 1)
+      p.y = norm.rvs(p.y, 1)
+      p.theta= norm.rvs(p.theta, math.radians(1))
+      p.w = 1
+
+    return particulas_pesos
 
 
     
